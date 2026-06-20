@@ -1,0 +1,6 @@
+{
+  "name": "ETF 追蹤器",
+  "description": "提供主動式與被動式 ETF 追蹤儀表板，即時呈現最新成分股配置比例、今日與昨日的買進賣出異動表、以及近 5 日內成分股精密股數與金額之每日變化趨勢表。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
