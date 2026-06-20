@@ -5,7 +5,7 @@ import {
   Calendar, DollarSign, Briefcase, Sparkles, Sliders, Info
 } from 'lucide-react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
-import { POPULAR_ETFS } from './etfData';
+import { POPULAR_ETFS, getETFCoverData } from './etfData';
 
 export default function App() {
   // ETFs Lists state
@@ -24,42 +24,32 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // 1. Fetch initial ETFs list
+  // 1. Use local ETF metadata from src/etfData.ts.
+  // GitHub Pages / static hosting cannot run /api routes, so do not fetch /api/etfs here.
   useEffect(() => {
-    fetch('/api/etfs')
-      .then(res => res.json())
-      .then((data: ETF[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setEtfs(data);
-          // Only change selected selection if it was not already resolved
-          if (!selectedEtf) {
-            const firstPassive = data.find(e => e.type === 'PASSIVE');
-            if (firstPassive) {
-              setSelectedEtf(firstPassive);
-            } else {
-              setSelectedEtf(data[0]);
-            }
-          }
-        }
-      })
-      .catch(err => console.error('Error fetching list of ETFs:', err));
+    setEtfs(POPULAR_ETFS);
+    if (!selectedEtf) {
+      setSelectedEtf(POPULAR_ETFS.find(e => e.type === selectedType) || POPULAR_ETFS[0] || null);
+    }
   }, []);
 
-  // 2. Fetch ETF data (Constituents list & 5-Day Stock History matrix)
-  const fetchData = (force = false) => {
+  // 2. Load ETF holdings from src/etfData.ts and src/scrapedDataCache.ts.
+  // This works on GitHub Pages because it does not require a backend API server.
+  const fetchData = async () => {
     if (!selectedEtf) return;
     setLoading(true);
-    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}${force ? '&force=true' : ''}`)
-      .then(res => res.json())
-      .then(data => {
-        setHoldings(data.holdings || []);
-        setFiveDayHistory(data.fiveDayHistory || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching holdings metrics:', err);
-        setLoading(false);
-      });
+
+    try {
+      const data = await getETFCoverData(selectedEtf.code, selectedDate, false);
+      setHoldings(Array.isArray(data.holdings) ? data.holdings : []);
+      setFiveDayHistory(Array.isArray(data.fiveDayHistory) ? data.fiveDayHistory : []);
+    } catch (err) {
+      console.error('Error loading local ETF holdings data:', err);
+      setHoldings([]);
+      setFiveDayHistory([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -136,7 +126,7 @@ export default function App() {
 
             {/* Manual Reload */}
             <button
-              onClick={() => fetchData(true)}
+              onClick={fetchData}
               disabled={loading}
               className="p-2 border border-slate-200 bg-white rounded-lg text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
               title="重新載入"
