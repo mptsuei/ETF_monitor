@@ -4,6 +4,45 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
+    <script>
+      // Capture early errors and forward to server log
+      window.onerror = function(message, source, lineno, colno, error) {
+        fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'error',
+            message: message + ' at ' + source + ':' + lineno + ':' + colno,
+            stack: error ? error.stack : ''
+          })
+        }).catch(() => {});
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function(event) {
+        fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'unhandledrejection',
+            message: event.reason ? String(event.reason) : 'Unhandled promise rejection',
+            stack: event.reason && event.reason.stack ? event.reason.stack : ''
+          })
+        }).catch(() => {});
+      });
+      // Capture console errors
+      const origError = console.error;
+      console.error = function(...args) {
+        origError.apply(console, args);
+        fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'console.error',
+            message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+          })
+        }).catch(() => {});
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

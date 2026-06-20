@@ -13,18 +13,26 @@ app.get('/api/etfs', (req, res) => {
   res.json(POPULAR_ETFS);
 });
 
+// Capture client logs
+app.post('/api/log', (req, res) => {
+  const { type, message, stack } = req.body;
+  console.log(`[CLIENT-LOG] [${type}] ${message}`, stack || '');
+  res.sendStatus(200);
+});
+
 // 2. Get ETF Holdings, Buy/Sell Difference (Today vs Yesterday) and 5-Day Change log
 app.get('/api/etf/:code/holdings', async (req, res) => {
   try {
     const { code } = req.params;
     const date = (req.query.date as string) || '2026-06-19';
+    const force = req.query.force === 'true';
 
     const etf = POPULAR_ETFS.find(e => e.code.toUpperCase() === code.toUpperCase());
     if (!etf) {
       return res.status(404).json({ error: `ETF ${code} not found` });
     }
 
-    const { holdings, fiveDayHistory } = await getETFCoverData(etf.code, date);
+    const { holdings, fiveDayHistory } = await getETFCoverData(etf.code, date, force);
 
     res.json({
       etf,
