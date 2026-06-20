@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
-import { POPULAR_ETFS, getETFCoverData } from './etfData';
 
 export default function App() {
   // ETFs Lists state
@@ -23,37 +22,38 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // 1. Load initial ETFs list directly from local data.
-  // This removes the dependency on /api/etfs, so the app can run on Vercel as a static Vite site.
+  // 1. Fetch initial ETFs list
   useEffect(() => {
-    setEtfs(POPULAR_ETFS);
-
-    const firstPassive = POPULAR_ETFS.find(e => e.type === 'PASSIVE');
-    if (firstPassive) {
-      setSelectedEtf(firstPassive);
-    } else if (POPULAR_ETFS.length > 0) {
-      setSelectedEtf(POPULAR_ETFS[0]);
-    }
+    fetch('/api/etfs')
+      .then(res => res.json())
+      .then((data: ETF[]) => {
+        setEtfs(data);
+        // Find first passive ETF
+        const firstPassive = data.find(e => e.type === 'PASSIVE');
+        if (firstPassive) {
+          setSelectedEtf(firstPassive);
+        } else if (data.length > 0) {
+          setSelectedEtf(data[0]);
+        }
+      })
+      .catch(err => console.error('Error fetching list of ETFs:', err));
   }, []);
 
-  // 2. Load ETF data directly from local functions.
-  // This removes the dependency on /api/etf/:code/holdings.
-  const fetchData = async () => {
+  // 2. Fetch ETF data (Constituents list & 5-Day Stock History matrix)
+  const fetchData = () => {
     if (!selectedEtf) return;
-
     setLoading(true);
-
-    try {
-      const data = await getETFCoverData(selectedEtf.code, selectedDate);
-      setHoldings(data.holdings || []);
-      setFiveDayHistory(data.fiveDayHistory || []);
-    } catch (err) {
-      console.error('Error resolving holdings metrics:', err);
-      setHoldings([]);
-      setFiveDayHistory([]);
-    } finally {
-      setLoading(false);
-    }
+    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}`)
+      .then(res => res.json())
+      .then(data => {
+        setHoldings(data.holdings || []);
+        setFiveDayHistory(data.fiveDayHistory || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching holdings metrics:', err);
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
