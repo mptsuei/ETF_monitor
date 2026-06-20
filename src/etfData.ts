@@ -1,4 +1,5 @@
 import { ETF, ETFHolding, FiveDayStockHistory, DailyHolding } from './types';
+import { SCRAPED_DATA_CACHE } from './scrapedDataCache';
 
 export const POPULAR_ETFS: ETF[] = [
   // Passive ETFs (被動式 ETF)
@@ -645,6 +646,8 @@ export async function getETFCoverData(code: string, date: string): Promise<{ hol
   const scraped = await fetchLiveMoneyDJHoldings(code);
   if (scraped && scraped.length > 0) {
     resolvedHoldingsSource = scraped;
+  } else if (SCRAPED_DATA_CACHE[code]) {
+    resolvedHoldingsSource = SCRAPED_DATA_CACHE[code];
   } else {
     // Robust fallbacks based on ETF code
     if (code === '00403A') {
