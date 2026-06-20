@@ -7,41 +7,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
 
-const getApiBaseUrl = () => {
-  const envBase = (import.meta as any).env?.VITE_API_BASE_URL?.trim();
-  if (envBase) return envBase.replace(/\/$/, '');
-
-  // Local Vite preview/dev server usually runs on 5173/4173, while server.ts often runs on 3001.
-  // In production, keep same-origin so Vercel/Netlify-style /api routes still work.
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port !== '3001') {
-    return 'http://localhost:3001';
-  }
-
-  return '';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-
-async function apiGet<T>(path: string): Promise<T> {
-  const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) {
-    throw new Error(`API 連線失敗：${response.status} ${response.statusText} (${url})`);
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await response.text();
-    throw new Error(`API 回傳不是 JSON，請確認後端是否有啟動或部署。網址：${url}；回傳：${text.slice(0, 120)}`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
-
 export default function App() {
   // ETFs Lists state
   const [etfs, setEtfs] = useState<ETF[]>([]);
@@ -56,16 +21,13 @@ export default function App() {
   const [fiveDayHistory, setFiveDayHistory] = useState<FiveDayStockHistory[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [apiError, setApiError] = useState<string | null>(null);
 
   // 1. Fetch initial ETFs list
   useEffect(() => {
-    const loadEtfs = async () => {
-      try {
-        setApiError(null);
-        const data = await apiGet<ETF[]>('/api/etfs');
-        setEtfs(Array.isArray(data) ? data : []);
-
+    fetch('/api/etfs')
+      .then(res => res.json())
+      .then((data: ETF[]) => {
+        setEtfs(data);
         // Find first passive ETF
         const firstPassive = data.find(e => e.type === 'PASSIVE');
         if (firstPassive) {
@@ -73,39 +35,25 @@ export default function App() {
         } else if (data.length > 0) {
           setSelectedEtf(data[0]);
         }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('Error fetching list of ETFs:', err);
-        setApiError(message);
-        setEtfs([]);
-        setSelectedEtf(null);
-      }
-    };
-
-    loadEtfs();
+      })
+      .catch(err => console.error('Error fetching list of ETFs:', err));
   }, []);
 
   // 2. Fetch ETF data (Constituents list & 5-Day Stock History matrix)
-  const fetchData = async () => {
+  const fetchData = () => {
     if (!selectedEtf) return;
     setLoading(true);
-    setApiError(null);
-
-    try {
-      const data = await apiGet<{ holdings?: ETFHolding[]; fiveDayHistory?: FiveDayStockHistory[] }>(
-        `/api/etf/${encodeURIComponent(selectedEtf.code)}/holdings?date=${encodeURIComponent(selectedDate)}`
-      );
-      setHoldings(Array.isArray(data.holdings) ? data.holdings : []);
-      setFiveDayHistory(Array.isArray(data.fiveDayHistory) ? data.fiveDayHistory : []);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('Error fetching holdings metrics:', err);
-      setApiError(message);
-      setHoldings([]);
-      setFiveDayHistory([]);
-    } finally {
-      setLoading(false);
-    }
+    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}`)
+      .then(res => res.json())
+      .then(data => {
+        setHoldings(data.holdings || []);
+        setFiveDayHistory(data.fiveDayHistory || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching holdings metrics:', err);
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -196,17 +144,6 @@ export default function App() {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        {apiError && (
-          <section className="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 text-xs leading-relaxed">
-            <div className="font-black text-sm mb-1">資料連線失敗</div>
-            <div className="font-mono break-all">{apiError}</div>
-            <div className="mt-2 text-red-700">
-              目前前端使用的 API 位置：<span className="font-mono">{API_BASE_URL || '同一個網站網域 /api'}</span>。
-              如果你是在本機測試，請先啟動 server.ts；如果部署在 GitHub Pages，GitHub Pages 不能執行 /api 後端，需要改用 Vercel/Render 或設定 VITE_API_BASE_URL。
-            </div>
-          </section>
-        )}
-
         {/* SECTION A: Segment Switcher (Passive / Active) */}
         <section className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="space-y-1 text-center sm:text-left">
@@ -292,7 +229,7 @@ export default function App() {
         </section>
 
         {/* Selected target ETF Info Banner */}
-        {selectedEtf && (
+        {selectedEtf ? (
           <div className="space-y-6">
             
             {/* Target ETF Overview Banner */}
@@ -603,6 +540,18 @@ export default function App() {
               </div>
             )}
 
+          </div>
+        ) : (
+          <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center max-w-lg mx-auto flex flex-col items-center justify-center gap-4 shadow-sm my-12 animate-pulse">
+            <div className="p-3 bg-teal-50 rounded-full text-teal-600">
+              <RefreshCw className="w-6 h-6 animate-spin duration-1000" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm text-slate-800">正在連線載入 ETF 追蹤與快取特徵數據...</h3>
+              <p className="text-slate-500 text-[11px] leading-relaxed max-w-sm mx-auto">
+                系統正嘗試即時向伺服器載入法人成分股明細與成交數據。如網絡延遲或無回應，系統將在載入後自動解讀並啟用高完整度快取備份，請稍候片刻。
+              </p>
+            </div>
           </div>
         )}
 

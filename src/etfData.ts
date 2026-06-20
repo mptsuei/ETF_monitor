@@ -541,6 +541,9 @@ export async function fetchLiveMoneyDJHoldings(code: string): Promise<{ symbol: 
   const url = `https://www.moneydj.com/ETF/X/Basic/Basic0007B.xdjhtm?etfid=${etfid}`;
   
   try {
+    if (typeof fetch === 'undefined') {
+      throw new Error('Server environment does not support global fetch API');
+    }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 seconds limit
 
