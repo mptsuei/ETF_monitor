@@ -639,19 +639,26 @@ export async function fetchLiveMoneyDJHoldings(code: string): Promise<{ symbol: 
   return [];
 }
 
-export async function getETFCoverData(code: string, date: string): Promise<{ holdings: ETFHolding[]; fiveDayHistory: FiveDayStockHistory[] }> {
+export async function getETFCoverData(code: string, date: string, forceLive = false): Promise<{ holdings: ETFHolding[]; fiveDayHistory: FiveDayStockHistory[] }> {
   const isTaiwan = true;
   const isMainlyActive = POPULAR_ETFS.find(e => e.code.toUpperCase() === code.toUpperCase())?.type === 'ACTIVE';
 
   let resolvedHoldingsSource: { symbol: string; weight: number; name?: string; sharesHeld?: number }[] = [];
 
-  // Try live scrape first!
-  const scraped = await fetchLiveMoneyDJHoldings(code);
-  if (scraped && scraped.length > 0) {
-    resolvedHoldingsSource = scraped;
-  } else if (SCRAPED_DATA_CACHE[code]) {
+  // Use SCRAPED_DATA_CACHE first to make the response extremely fast (~50ms) and reliable
+  if (!forceLive && SCRAPED_DATA_CACHE[code]) {
     resolvedHoldingsSource = SCRAPED_DATA_CACHE[code];
   } else {
+    // Try live scrape from MoneyDJ
+    const scraped = await fetchLiveMoneyDJHoldings(code);
+    if (scraped && scraped.length > 0) {
+      resolvedHoldingsSource = scraped;
+    } else if (SCRAPED_DATA_CACHE[code]) {
+      resolvedHoldingsSource = SCRAPED_DATA_CACHE[code];
+    }
+  }
+
+  if (resolvedHoldingsSource.length === 0) {
     // Robust fallbacks based on ETF code
     if (code === '00403A') {
       resolvedHoldingsSource = REAL_EXCEL_00403A_HOLDINGS_SOURCE;

@@ -4,7 +4,6 @@ import {
   Activity, ArrowUpRight, ArrowDownRight, RefreshCw, Layers2,
   Calendar, DollarSign, Briefcase, Sparkles, Sliders, Info
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
 import { POPULAR_ETFS } from './etfData';
 
@@ -47,10 +46,10 @@ export default function App() {
   }, []);
 
   // 2. Fetch ETF data (Constituents list & 5-Day Stock History matrix)
-  const fetchData = () => {
+  const fetchData = (force = false) => {
     if (!selectedEtf) return;
     setLoading(true);
-    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}`)
+    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}${force ? '&force=true' : ''}`)
       .then(res => res.json())
       .then(data => {
         setHoldings(data.holdings || []);
@@ -137,7 +136,7 @@ export default function App() {
 
             {/* Manual Reload */}
             <button
-              onClick={fetchData}
+              onClick={() => fetchData(true)}
               disabled={loading}
               className="p-2 border border-slate-200 bg-white rounded-lg text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
               title="重新載入"
