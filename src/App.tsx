@@ -23,7 +23,8 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // 1. Load initial ETFs list directly from local data (Vercel static deployment friendly)
+  // 1. Load initial ETFs list directly from local data.
+  // This removes the dependency on /api/etfs, so the app can run on Vercel as a static Vite site.
   useEffect(() => {
     setEtfs(POPULAR_ETFS);
 
@@ -35,9 +36,11 @@ export default function App() {
     }
   }, []);
 
-  // 2. Load ETF data directly from local generator (no Express /api dependency)
+  // 2. Load ETF data directly from local functions.
+  // This removes the dependency on /api/etf/:code/holdings.
   const fetchData = async () => {
     if (!selectedEtf) return;
+
     setLoading(true);
 
     try {
@@ -45,7 +48,7 @@ export default function App() {
       setHoldings(data.holdings || []);
       setFiveDayHistory(data.fiveDayHistory || []);
     } catch (err) {
-      console.error('Error loading holdings metrics:', err);
+      console.error('Error resolving holdings metrics:', err);
       setHoldings([]);
       setFiveDayHistory([]);
     } finally {
@@ -98,7 +101,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900 font-display flex items-center gap-2">
-                主動與被動型 ETF 追蹤監控台
+                ETF 追蹤器
               </h1>
               <p className="text-xs text-slate-500 font-medium">即時比對最新昨日與今日交易，剖析近五日成分股股數與配比金額趨勢表</p>
             </div>
@@ -336,10 +339,10 @@ export default function App() {
                                   NT$ {h.price.toLocaleString()}
                                 </td>
                                 <td className={`p-4 text-right pr-6 font-extrabold ${
-                                  isPositive ? 'text-emerald-600' : 'text-rose-600'
+                                  isPositive ? 'text-rose-600' : 'text-emerald-600'
                                 }`}>
                                   <span className="flex items-center justify-end gap-0.5">
-                                    {isPositive ? <ArrowUpRight className="w-3 h-3 text-emerald-500" /> : <ArrowDownRight className="w-3 h-3 text-rose-500" />}
+                                    {isPositive ? <ArrowUpRight className="w-3 h-3 text-rose-500" /> : <ArrowDownRight className="w-3 h-3 text-emerald-500" />}
                                     {isPositive ? '+' : ''}{h.priceChange}%
                                   </span>
                                 </td>
@@ -398,30 +401,30 @@ export default function App() {
                                   {item.name}
                                 </td>
                                 <td className={`p-4 text-right font-extrabold ${
-                                  item.weightChange > 0 ? 'text-emerald-600' : item.weightChange < 0 ? 'text-rose-600' : 'text-slate-500'
+                                  item.weightChange > 0 ? 'text-rose-600' : item.weightChange < 0 ? 'text-emerald-600' : 'text-slate-500'
                                 }`}>
                                   {item.weightChange > 0 ? '+' : ''}{item.weightChange}%
                                 </td>
                                 <td className="p-4 text-center">
                                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-black tracking-wide leading-none ${
                                     isBuy 
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                                      : 'bg-rose-50 text-rose-700 border border-rose-100'
+                                      ? 'bg-rose-50 text-rose-700 border border-rose-100' 
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                                   }`}>
                                     {isBuy ? (
                                       <>
-                                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                                        <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
                                         買進加碼
                                       </>
                                     ) : (
                                       <>
-                                        <ArrowDownRight className="w-3.5 h-3.5 text-rose-500" />
+                                        <ArrowDownRight className="w-3.5 h-3.5 text-emerald-500" />
                                         賣出調節
                                       </>
                                     )}
                                   </span>
                                 </td>
-                                <td className={`p-4 text-right font-black ${isBuy ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                <td className={`p-4 text-right font-black ${isBuy ? 'text-rose-700' : 'text-emerald-700'}`}>
                                   {isBuy ? '+' : ''}{item.sharesChanged.toLocaleString()} 
                                   <span className="text-[10px] font-normal text-slate-400 font-sans ml-1">張</span>
                                 </td>
@@ -442,13 +445,13 @@ export default function App() {
                 <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                   <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-emerald-600" />
+                      <Calendar className="w-4 h-4 text-rose-600" />
                       <h3 className="text-sm font-black text-slate-900 font-display">
                         三、近 5 日成分股持股變化趨勢表 (以個股為核心觀測單位)
                       </h3>
                     </div>
-                    <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded font-bold uppercase">
-                      綠色：比前一日多 / 紅色：比前一日少
+                    <span className="text-[10px] text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded font-bold uppercase">
+                      紅色：比前一日多 / 綠色：比前一日少
                     </span>
                   </div>
 
@@ -456,7 +459,7 @@ export default function App() {
                     <Info className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-slate-900">使用提示：</strong>
-                      此矩陣以個股為觀測主體，橫向追蹤 5 個交易日的持股張數。每一天的增減對比均與<span className="underline decoration-teal-500 underline-offset-2 decoration-2">前一日</span>數據進行精準比較，高於前一日持股則標註為<span className="text-emerald-600 font-bold bg-emerald-50 px-1 rounded">綠色加碼</span>，低於前一日則標註為<span className="text-rose-600 font-bold bg-rose-50 px-1 rounded">紅色減持</span>。
+                      此矩陣以個股為觀測主體，橫向追蹤 5 個交易日的持股張數。每一天的增減對比均與<span className="underline decoration-teal-500 underline-offset-2 decoration-2">前一日</span>數據進行精準比較，高於前一日持股則標註為<span className="text-rose-600 font-bold bg-rose-50 px-1 rounded">紅色加碼</span>，低於前一日則標註為<span className="text-emerald-600 font-bold bg-emerald-50 px-1 rounded">綠色減持</span>。
                     </div>
                   </div>
 
@@ -501,13 +504,13 @@ export default function App() {
                                   let icon = null;
 
                                   if (status === 'UP') {
-                                    bgClass = 'bg-emerald-50 text-emerald-800 border-emerald-100';
-                                    textClass = 'text-emerald-700 font-extrabold';
-                                    icon = <ArrowUpRight className="w-2.5 h-2.5 text-emerald-500" />;
-                                  } else if (status === 'DOWN') {
                                     bgClass = 'bg-rose-50 text-rose-800 border-rose-100';
                                     textClass = 'text-rose-700 font-extrabold';
-                                    icon = <ArrowDownRight className="w-2.5 h-2.5 text-rose-500" />;
+                                    icon = <ArrowUpRight className="w-2.5 h-2.5 text-rose-500" />;
+                                  } else if (status === 'DOWN') {
+                                    bgClass = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+                                    textClass = 'text-emerald-700 font-extrabold';
+                                    icon = <ArrowDownRight className="w-2.5 h-2.5 text-emerald-500" />;
                                   }
 
                                   return (
@@ -546,7 +549,7 @@ export default function App() {
       <footer className="bg-white border-t border-slate-200 py-8 mt-16 font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-2">
           <p className="text-xs text-slate-400 font-medium">
-            主動與被動型 ETF 追蹤監控台 © 2026. All rights reserved.
+            ETF 追蹤器 © 2026. All rights reserved.
           </p>
           <p className="text-[10px] text-slate-450 italic">
             本服務所提供之成分股更動、交易股數、張數以及變動金額，均為模擬及統計數據分析估計值，不構成任何真實交易、融資或投資建議。
