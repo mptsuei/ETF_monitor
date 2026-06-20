@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
+import { POPULAR_ETFS, getETFCoverData } from './etfData';
 
 export default function App() {
   // ETFs Lists state
@@ -22,38 +23,34 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // 1. Fetch initial ETFs list
+  // 1. Load initial ETFs list directly from local data (Vercel static deployment friendly)
   useEffect(() => {
-    fetch('/api/etfs')
-      .then(res => res.json())
-      .then((data: ETF[]) => {
-        setEtfs(data);
-        // Find first passive ETF
-        const firstPassive = data.find(e => e.type === 'PASSIVE');
-        if (firstPassive) {
-          setSelectedEtf(firstPassive);
-        } else if (data.length > 0) {
-          setSelectedEtf(data[0]);
-        }
-      })
-      .catch(err => console.error('Error fetching list of ETFs:', err));
+    setEtfs(POPULAR_ETFS);
+
+    const firstPassive = POPULAR_ETFS.find(e => e.type === 'PASSIVE');
+    if (firstPassive) {
+      setSelectedEtf(firstPassive);
+    } else if (POPULAR_ETFS.length > 0) {
+      setSelectedEtf(POPULAR_ETFS[0]);
+    }
   }, []);
 
-  // 2. Fetch ETF data (Constituents list & 5-Day Stock History matrix)
-  const fetchData = () => {
+  // 2. Load ETF data directly from local generator (no Express /api dependency)
+  const fetchData = async () => {
     if (!selectedEtf) return;
     setLoading(true);
-    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}`)
-      .then(res => res.json())
-      .then(data => {
-        setHoldings(data.holdings || []);
-        setFiveDayHistory(data.fiveDayHistory || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching holdings metrics:', err);
-        setLoading(false);
-      });
+
+    try {
+      const data = await getETFCoverData(selectedEtf.code, selectedDate);
+      setHoldings(data.holdings || []);
+      setFiveDayHistory(data.fiveDayHistory || []);
+    } catch (err) {
+      console.error('Error loading holdings metrics:', err);
+      setHoldings([]);
+      setFiveDayHistory([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
