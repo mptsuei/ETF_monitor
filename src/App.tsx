@@ -6,12 +6,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
+import { POPULAR_ETFS } from './etfData';
 
 export default function App() {
   // ETFs Lists state
-  const [etfs, setEtfs] = useState<ETF[]>([]);
+  const [etfs, setEtfs] = useState<ETF[]>(POPULAR_ETFS);
   const [selectedType, setSelectedType] = useState<'PASSIVE' | 'ACTIVE'>('PASSIVE');
-  const [selectedEtf, setSelectedEtf] = useState<ETF | null>(null);
+  const [selectedEtf, setSelectedEtf] = useState<ETF | null>(
+    POPULAR_ETFS.find(e => e.type === 'PASSIVE') || POPULAR_ETFS[0]
+  );
   
   // Date parameter
   const [selectedDate] = useState<string>('2026-06-19');
@@ -27,13 +30,17 @@ export default function App() {
     fetch('/api/etfs')
       .then(res => res.json())
       .then((data: ETF[]) => {
-        setEtfs(data);
-        // Find first passive ETF
-        const firstPassive = data.find(e => e.type === 'PASSIVE');
-        if (firstPassive) {
-          setSelectedEtf(firstPassive);
-        } else if (data.length > 0) {
-          setSelectedEtf(data[0]);
+        if (Array.isArray(data) && data.length > 0) {
+          setEtfs(data);
+          // Only change selected selection if it was not already resolved
+          if (!selectedEtf) {
+            const firstPassive = data.find(e => e.type === 'PASSIVE');
+            if (firstPassive) {
+              setSelectedEtf(firstPassive);
+            } else {
+              setSelectedEtf(data[0]);
+            }
+          }
         }
       })
       .catch(err => console.error('Error fetching list of ETFs:', err));
