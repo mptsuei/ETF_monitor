@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETF, ETFHolding, FiveDayStockHistory } from './types';
-import { POPULAR_ETFS, getETFCoverData } from './etfData';
 
 export default function App() {
   // ETFs Lists state
@@ -23,62 +22,38 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // 1. Load initial ETFs list. Try Vercel API first; if API is not available, use local data.
+  // 1. Fetch initial ETFs list
   useEffect(() => {
-    let mounted = true;
-
-    const applyEtfs = (data: ETF[]) => {
-      if (!mounted) return;
-      setEtfs(data);
-      const firstPassive = data.find(e => e.type === 'PASSIVE');
-      if (firstPassive) {
-        setSelectedEtf(firstPassive);
-      } else if (data.length > 0) {
-        setSelectedEtf(data[0]);
-      }
-    };
-
     fetch('/api/etfs')
-      .then(res => {
-        if (!res.ok) throw new Error(`API /api/etfs failed: ${res.status}`);
-        return res.json();
+      .then(res => res.json())
+      .then((data: ETF[]) => {
+        setEtfs(data);
+        // Find first passive ETF
+        const firstPassive = data.find(e => e.type === 'PASSIVE');
+        if (firstPassive) {
+          setSelectedEtf(firstPassive);
+        } else if (data.length > 0) {
+          setSelectedEtf(data[0]);
+        }
       })
-      .then((data: ETF[]) => applyEtfs(data))
-      .catch(err => {
-        console.warn('Using local ETF list fallback:', err);
-        applyEtfs(POPULAR_ETFS);
-      });
-
-    return () => {
-      mounted = false;
-    };
+      .catch(err => console.error('Error fetching list of ETFs:', err));
   }, []);
 
-  // 2. Fetch ETF data. Try Vercel API first; if API is not available, use local generated data.
-  const fetchData = async () => {
+  // 2. Fetch ETF data (Constituents list & 5-Day Stock History matrix)
+  const fetchData = () => {
     if (!selectedEtf) return;
     setLoading(true);
-
-    try {
-      const res = await fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}`);
-      if (!res.ok) throw new Error(`API holdings failed: ${res.status}`);
-      const data = await res.json();
-      setHoldings(data.holdings || []);
-      setFiveDayHistory(data.fiveDayHistory || []);
-    } catch (err) {
-      console.warn('Using local ETF holdings fallback:', err);
-      try {
-        const data = await getETFCoverData(selectedEtf.code, selectedDate);
+    fetch(`/api/etf/${selectedEtf.code}/holdings?date=${selectedDate}`)
+      .then(res => res.json())
+      .then(data => {
         setHoldings(data.holdings || []);
         setFiveDayHistory(data.fiveDayHistory || []);
-      } catch (fallbackErr) {
-        console.error('Error resolving local holdings metrics:', fallbackErr);
-        setHoldings([]);
-        setFiveDayHistory([]);
-      }
-    } finally {
-      setLoading(false);
-    }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching holdings metrics:', err);
+        setLoading(false);
+      });
   };
 
   useEffect(() => {

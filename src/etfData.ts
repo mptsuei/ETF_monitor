@@ -265,7 +265,7 @@ export const STOCK_NAMES: Record<string, string> = {
   '3443': '創意', '8150': '南茂', '5439': '高技', '4966': '譜瑞-KY', '4958': '臻鼎-KY',
   '6278': '台表科', '1590': '亞德客-KY', '8358': '金居', '6271': '同欣電', '6191': '精成科',
   '6488': '環球晶', '3264': '欣銓', '3376': '新日興', '2313': '華通', '1815': '富喬',
-  '2481': '強茂', '2439': '美律', '5347': '世界', '2344': '華邦電', '2337': '旺宏'
+  '2481': '強茂', '2439': '美律', '5347': '世界'
 };
 
 const INDUSTRY_MAP: Record<string, string> = {
@@ -287,7 +287,7 @@ const INDUSTRY_MAP: Record<string, string> = {
   '3443': '晶片設計/ASIC', '8150': '記憶體封測', '5439': '多層電路板', '4966': '高速傳輸IC', '4958': '軟性電路板',
   '6278': 'SMT打件導裝', '1590': '自動化氣動', '8358': '電解銅箔', '6271': '陶瓷基板封裝', '6191': '記憶體零組件',
   '6488': '矽晶圓製造', '3264': '積體電路測試', '3376': '摺疊機軸承', '2313': '高階電路板', '1815': '電子級玻纖布',
-  '2481': '二極體/晶圓', '2439': '電聲/藍牙耳機', '5347': '特殊晶圓代工', '2344': '記憶體/IC', '2337': '記憶體/IC'
+  '2481': '二極體/晶圓', '2439': '電聲/藍牙耳機', '5347': '特殊晶圓代工'
 };
 
 const BASE_PRICES: Record<string, number> = {
@@ -309,7 +309,7 @@ const BASE_PRICES: Record<string, number> = {
   '3443': 1180.0, '8150': 41.5, '5439': 102.0, '4966': 720.0, '4958': 122.0,
   '6278': 115.0, '1590': 860.0, '8358': 62.0, '6271': 138.0, '6191': 64.0,
   '6488': 465.0, '3264': 68.0, '3376': 210.0, '2313': 74.0, '1815': 22.5,
-  '2481': 61.2, '2439': 112.0, '5347': 92.5, '2344': 26.5, '2337': 27.2
+  '2481': 61.2, '2439': 112.0, '5347': 92.5
 };
 
 // Hand-tuned base constituents to provide exceptional realism for a few key ETFs
@@ -321,7 +321,6 @@ const ETF_CONSTITUENTS_MAP: Record<string, string[]> = {
   '00929': ['2454', '2379', '3034', '2382', '2301', '2303', '3711', '3231', '2357', '2377'],
   '00991A': ['2330', '2317', '2454', '2382', '2308', '3711', '3231', '2379', '3008', '5274', '3661'],
   '00981A': ['2330', '2317', '2881', '2454', '2382', '2301', '2345', '2603', '1513', '3711', '2891'],
-  '00403A': ['2330', '2327', '2303', '3037', '2344', '3017', '2383', '2368', '6223', '2454', '2308', '2345', '4958', '6669', '3653', '6274', '3533', '2337', '3711', '8996'],
   '00982A': ['2330', '2317', '3231', '2382', '2376', '2379', '1513', '2603', '3008', '5274', '3533']
 };
 
@@ -381,55 +380,41 @@ export function getETFConstituents(code: string): string[] {
 }
 
 // Generates 5-day history grouped by Stock (e.g. 台積電, with daily holdings changes + indicators)
-export function generateFiveDayChangesByStock(code: string, holdings: ETFHolding[]): FiveDayStockHistory[] {
+export function generateFiveDayChangesByStock(code: string, constituents: string[]): FiveDayStockHistory[] {
   // Consecutives 5 days: June 15 to June 19
   const dates = ['6/14', '6/15', '6/16', '6/17', '6/18', '6/19'];
 
-  return holdings.map((item) => {
-    const symbol = item.symbol;
+  return constituents.map((symbol) => {
+    // Generate simulated holding quantities for 6 days so we can compare 6/15 to 6/14, 6/16 to 6/15, etc.
+    const baseMul = getSeededRandom(code + symbol + 'holding_base') * 13000 + 1500; // e.g. base shares 1,500 to 14,500張/股
     
-    // Friday (D5, dates[5], index 5) data is EXACTLY today's data:
-    const fridayShares = Math.max(1, Math.round((item.sharesHeld || 1000) / 1000));
-    const fridayPrice = item.price;
-    
-    // Thursday (D4, dates[4], index 4) data is:
-    // Thursday shares = Friday shares - item.sharesChanged
-    // Thursday price = item.prevPrice
-    const thursdayShares = Math.max(1, fridayShares - (item.sharesChanged || 0));
-    const thursdayPrice = item.prevPrice;
-
-    const sharesList: number[] = new Array(6);
-    const pricesList: number[] = new Array(6);
-
-    sharesList[5] = fridayShares;
-    pricesList[5] = fridayPrice;
-
-    sharesList[4] = thursdayShares;
-    pricesList[4] = thursdayPrice;
-
-    // Daily change scales based on the size of the stock holding
-    const scale = Math.max(5, Math.floor(fridayShares * 0.02));
-
-    // Back-calculate for 6/17 (index 3), 6/16 (index 2), 6/15 (index 1), 6/14 (index 0)
-    for (let idx = 3; idx >= 0; idx--) {
-      // Seeded random walk step
-      const seed = getSeededRandom(code + symbol + idx + 'back_history');
-      const step = Math.floor((seed - 0.5) * 2 * scale);
-      sharesList[idx] = Math.max(1, sharesList[idx + 1] - step);
-
-      // Seeded price walk
-      const pSeed = getSeededRandom(code + symbol + idx + 'back_price');
-      const pChange = (pSeed - 0.49) * 0.06; // -3% to +3%
-      pricesList[idx] = Number((pricesList[idx + 1] / (1 + pChange)).toFixed(2));
-    }
-
+    // Determine the historical daily holding counts
     const dailyHoldings: DailyHolding[] = [];
+
+    // Let's compute holdings for all 6 days
+    const tempSharesList: number[] = [];
+    const tempAmountsList: number[] = [];
+
+    dates.forEach((dateStr, idx) => {
+      const daySeed = getSeededRandom(code + symbol + dateStr + 'daily_move');
+      // Daily swing -5% to +5%
+      const swing = (daySeed - 0.49) * 0.08; 
+      const shares = Math.floor(baseMul * (1 + swing));
+      
+      const price = BASE_PRICES[symbol] || 100;
+      // Taiwan units: clicks are counted as "張數" (thousands of shares).
+      // Amount = (Price * shares * 1000) / 10000 = (Price * shares) / 10 (萬元)
+      const amountOnDay = Number((price * shares / 10).toFixed(1));
+
+      tempSharesList.push(shares);
+      tempAmountsList.push(amountOnDay);
+    });
 
     // Save index 1 to 5 as the 5 target days (6/15, 6/16, 6/17, 6/18, 6/19)
     for (let j = 1; j <= 5; j++) {
       const currentDateString = dates[j]; // '6/15', '6/16', etc.
-      const currentShares = sharesList[j];
-      const prevShares = sharesList[j - 1];
+      const currentShares = tempSharesList[j];
+      const prevShares = tempSharesList[j - 1];
       
       let compareStatus: 'UP' | 'DOWN' | 'EQUAL' = 'EQUAL';
       if (currentShares > prevShares) {
@@ -438,19 +423,17 @@ export function generateFiveDayChangesByStock(code: string, holdings: ETFHolding
         compareStatus = 'DOWN';
       }
 
-      const amountOnDay = Number((pricesList[j] * currentShares / 10).toFixed(1));
-
       dailyHoldings.push({
         date: currentDateString,
         shares: currentShares,
-        amount: amountOnDay,
+        amount: tempAmountsList[j],
         compareStatus
-      } as any);
+      } as any); // cast safely to include compareStatus
     }
 
     return {
       symbol,
-      name: item.name,
+      name: STOCK_NAMES[symbol] || symbol,
       history: dailyHoldings
     };
   });
@@ -509,30 +492,12 @@ export const REAL_EXCEL_00981A_HOLDINGS_SOURCE = [
   { symbol: '5347', weight: 0.00, sharesHeld: 1000 }
 ];
 
-export const REAL_EXCEL_00403A_HOLDINGS_SOURCE = [
-  { symbol: '2330', weight: 18.29, sharesHeld: 13300000 },
-  { symbol: '2327', weight: 6.19, sharesHeld: 10050000 },
-  { symbol: '2303', weight: 6.01, sharesHeld: 72400000 },
-  { symbol: '3037', weight: 4.95, sharesHeld: 8960000 },
-  { symbol: '2344', weight: 4.84, sharesHeld: 38800000 },
-  { symbol: '3017', weight: 4.45, sharesHeld: 3250000 },
-  { symbol: '2383', weight: 4.31, sharesHeld: 1350000 },
-  { symbol: '2368', weight: 3.63, sharesHeld: 4700000 },
-  { symbol: '6223', weight: 3.29, sharesHeld: 900000 },
-  { symbol: '2454', weight: 3.21, sharesHeld: 1280000 },
-  { symbol: '2308', weight: 2.98, sharesHeld: 2430000 },
-  { symbol: '2345', weight: 2.92, sharesHeld: 2100000 },
-  { symbol: '4958', weight: 2.36, sharesHeld: 6440000 },
-  { symbol: '6669', weight: 2.31, sharesHeld: 790000 },
-  { symbol: '3653', weight: 1.88, sharesHeld: 830000 },
-  { symbol: '6274', weight: 1.78, sharesHeld: 1700000 },
-  { symbol: '3533', weight: 1.62, sharesHeld: 1240000 },
-  { symbol: '2337', weight: 1.58, sharesHeld: 16350000 },
-  { symbol: '3711', weight: 1.57, sharesHeld: 4500000 },
-  { symbol: '8996', weight: 1.45, sharesHeld: 1034000 }
-];
-
 export async function fetchLiveMoneyDJHoldings(code: string): Promise<{ symbol: string; name: string; weight: number; sharesHeld: number }[]> {
+  // Disabled for Vercel deployment: keep data identical to the AI Studio simulated/fallback view.
+  // MoneyDJ live scraping may return different live holdings or be blocked by CORS/hosting,
+  // so we intentionally use the deterministic built-in ETF data below.
+  return [];
+
   const cleanCode = code.replace(/\.TW$/i, '').toUpperCase();
   const etfid = `${cleanCode}.TW`;
   
@@ -557,20 +522,14 @@ export async function fetchLiveMoneyDJHoldings(code: string): Promise<{ symbol: 
     }
 
     const arrayBuffer = await res.arrayBuffer();
+    // MoneyDJ encodes as Big5/CP950
     let html = '';
-    const utf8Decoder = new TextDecoder('utf-8');
-    const utf8Html = utf8Decoder.decode(arrayBuffer);
-    
-    // Check if the UTF-8 decode contains common characters or metadata
-    if (utf8Html.includes('成分') || utf8Html.includes('持股') || utf8Html.includes('代碼') || utf8Html.includes('台') || utf8Html.includes('國') || utf8Html.includes('ETF')) {
-      html = utf8Html;
-    } else {
-      try {
-        const big5Decoder = new TextDecoder('big5');
-        html = big5Decoder.decode(arrayBuffer);
-      } catch {
-        html = utf8Html;
-      }
+    try {
+      const decoder = new TextDecoder('big5');
+      html = decoder.decode(arrayBuffer);
+    } catch {
+      const decoder = new TextDecoder('utf-8');
+      html = decoder.decode(arrayBuffer);
     }
 
     // Parse the HTML similar to the PowerQuery (M) language logic from the user
@@ -592,10 +551,8 @@ export async function fetchLiveMoneyDJHoldings(code: string): Promise<{ symbol: 
     for (const r of dataRows) {
       const parts = r.split(/<td/i).slice(1);
       const cells = parts.map(p => {
-        const firstGt = p.indexOf('>');
-        const inside = firstGt !== -1 ? p.substring(firstGt + 1) : p;
-        const end = inside.toLowerCase().indexOf('</td>');
-        const raw = end !== -1 ? inside.substring(0, end) : inside;
+        const end = p.toLowerCase().indexOf('</td>');
+        const raw = end !== -1 ? p.substring(0, end) : p;
         return cleanText(raw);
       }).filter(c => c !== '');
 
@@ -647,9 +604,7 @@ export async function getETFCoverData(code: string, date: string): Promise<{ hol
     resolvedHoldingsSource = scraped;
   } else {
     // Robust fallbacks based on ETF code
-    if (code === '00403A') {
-      resolvedHoldingsSource = REAL_EXCEL_00403A_HOLDINGS_SOURCE;
-    } else if (code === '00981A') {
+    if (code === '00981A' || code === '00403A') {
       resolvedHoldingsSource = REAL_EXCEL_00981A_HOLDINGS_SOURCE;
     } else {
       // Simulate/Generate high quality holdings for other codes (e.g. 0050, 0056) dynamically
@@ -699,23 +654,6 @@ export async function getETFCoverData(code: string, date: string): Promise<{ hol
 
   const holdings: ETFHolding[] = [];
 
-  const getDynamicIndustry = (symbol: string): string => {
-    if (INDUSTRY_MAP[symbol]) return INDUSTRY_MAP[symbol];
-    const codeInt = parseInt(symbol, 10);
-    if (isNaN(codeInt)) return '電子其他';
-    if (symbol.startsWith('28') || symbol.startsWith('58')) return '金融業';
-    if (symbol.startsWith('26') || symbol.startsWith('56')) return '航運業';
-    if (symbol.startsWith('23')) {
-      if (['2330', '2303', '2337', '2344', '2449', '3711'].includes(symbol)) return '半導體';
-      if (['2353', '2357', '2377', '2382'].includes(symbol)) return '電腦及週邊';
-      return '光電電子';
-    }
-    if (symbol.startsWith('30') || symbol.startsWith('32')) return '電子零組件';
-    if (symbol.startsWith('24') || symbol.startsWith('62')) return '電子通路';
-    if (symbol.startsWith('8') || symbol.startsWith('66')) return '通信網路/伺服硬體';
-    return '電子其他';
-  };
-
   resolvedHoldingsSource.forEach((item, idx) => {
     const sym = item.symbol;
     const rSeed = getSeededRandom(sym + 'today');
@@ -727,9 +665,7 @@ export async function getETFCoverData(code: string, date: string): Promise<{ hol
     const weightDiff = Number((currentWeight - prevWeight).toFixed(2));
 
     // Prices
-    const rBaseSeed = getSeededRandom(sym + 'base_price_seed');
-    const rndPrice = Math.floor(45 + rBaseSeed * 450);
-    const basePrice = BASE_PRICES[sym] || rndPrice;
+    const basePrice = BASE_PRICES[sym] || 120;
     const priceChangeToday = Number(((getSeededRandom(sym + 'price_change') - 0.48) * 4).toFixed(2));
     const priceToday = Number((basePrice * (1 + (priceChangeToday / 100))).toFixed(2));
     const prevPrice = Number((priceToday / (1 + (priceChangeToday / 100))).toFixed(2));
@@ -769,13 +705,14 @@ export async function getETFCoverData(code: string, date: string): Promise<{ hol
       sharesChanged: actionState === 'SELL' ? -shares : shares,
       amountChanged: amount,
       action: actionState,
-      industry: getDynamicIndustry(sym),
+      industry: INDUSTRY_MAP[sym] || '電子其他',
       sharesHeld: item.sharesHeld
     });
   });
 
   // Calculate 5-Day history using resolved constituents
-  const fiveDayHistory = generateFiveDayChangesByStock(code, holdings);
+  const finalConstituents = resolvedHoldingsSource.map(h => h.symbol);
+  const fiveDayHistory = generateFiveDayChangesByStock(code, finalConstituents);
 
   return {
     holdings,
